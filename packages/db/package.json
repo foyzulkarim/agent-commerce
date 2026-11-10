@@ -1,0 +1,11 @@
+{
+  "name": "@ac/db",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "pg": "8.23.1",
+    "@ac/log": "*"
+  }
+}
