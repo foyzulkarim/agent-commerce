@@ -1,0 +1,7 @@
+{
+  "name": "inventory",
+  "queue": "inventory-agent",
+  "consumes": ["composition.requested"],
+  "emits": ["composition.proposed"],
+  "limits": { "max_calls": 8, "max_tokens": 1024, "timeout_ms": 60000, "effort": "low" }
+}

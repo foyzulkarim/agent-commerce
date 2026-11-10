@@ -1,0 +1,9 @@
+{
+  "name": "@ac/agent-notification",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@ac/agent-runtime": "*"
+  }
+}

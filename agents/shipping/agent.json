@@ -1,0 +1,7 @@
+{
+  "name": "shipping",
+  "queue": "shipping-agent",
+  "consumes": ["order.confirmed", "address.provided", "payment.authorized"],
+  "emits": ["shipment.quoted", "shipment.booked", "shipment.failed"],
+  "limits": { "max_calls": 8, "max_tokens": 1024, "timeout_ms": 60000, "effort": "low" }
+}

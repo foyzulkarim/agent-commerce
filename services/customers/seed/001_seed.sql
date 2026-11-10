@@ -1,0 +1,1 @@
+-- customers: idempotent seed. Runs on every start, so use ON CONFLICT DO NOTHING.

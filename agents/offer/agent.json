@@ -1,0 +1,7 @@
+{
+  "name": "offer",
+  "queue": "offer-agent",
+  "consumes": ["watch.matched", "composition.proposed", "shipment.failed"],
+  "emits": ["composition.requested"],
+  "limits": { "max_calls": 8, "max_tokens": 1024, "timeout_ms": 60000, "effort": "low" }
+}

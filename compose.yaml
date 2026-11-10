@@ -1,0 +1,141 @@
+# agent-commerce. One Node image for every service and agent; the command differs per container.
+# 15 containers (design §14): 7 services, 6 agents, postgres, rabbitmq. Host ports: chat-ui 3000, orders 3001,
+# email 3002, catalogue-mock 3003, shipping-mock 3004, RabbitMQ UI 15672. MCP ports stay inside the network.
+# AMQP_URL, DECISIONS_DATABASE_URL and MODEL_NAME have defaults in code; ANTHROPIC_API_KEY comes from .env.
+
+x-node: &node
+  build: .
+  image: agent-commerce-node
+  env_file:
+    - path: .env
+      required: false
+  depends_on:
+    postgres:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:18@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42
+    environment:
+      POSTGRES_USER: ac
+      POSTGRES_PASSWORD: ac
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ac"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4.4-management@sha256:af6f50d38098d8bd52fef7f3fa85015dd8b2bf6def58e995bf584ae9ba0f6407
+    environment:
+      RABBITMQ_DEFAULT_USER: ac
+      RABBITMQ_DEFAULT_PASS: ac
+    ports:
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  chat-ui:
+    <<: *node
+    command: node services/chat-ui/src/main.ts
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+
+  orders:
+    <<: *node
+    command: node services/orders/src/main.ts
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: postgres://ac:ac@postgres:5432/orders
+      PORT: "3001"
+
+  agent-shopping:
+    <<: *node
+    command: node agents/shopping/main.ts
+    environment:
+      MCP_SERVERS: http://orders:3001/mcp
+
+  customers:
+    <<: *node
+    command: node services/customers/src/main.ts
+    environment:
+      DATABASE_URL: postgres://ac:ac@postgres:5432/customers
+      PORT: "3000"
+
+  email:
+    <<: *node
+    command: node services/email/src/main.ts
+    ports:
+      - "3002:3002"
+    environment:
+      DATABASE_URL: postgres://ac:ac@postgres:5432/email
+      PORT: "3002"
+
+  catalogue-mock:
+    <<: *node
+    command: node services/catalogue-mock/src/main.ts
+    ports:
+      - "3003:3003"
+    environment:
+      DATABASE_URL: postgres://ac:ac@postgres:5432/catalogue_mock
+      PORT: "3003"
+
+  shipping-mock:
+    <<: *node
+    command: node services/shipping-mock/src/main.ts
+    ports:
+      - "3004:3004"
+    environment:
+      DATABASE_URL: postgres://ac:ac@postgres:5432/shipping_mock
+      PORT: "3004"
+
+  payment-mock:
+    <<: *node
+    command: node services/payment-mock/src/main.ts
+    environment:
+      DATABASE_URL: postgres://ac:ac@postgres:5432/payment_mock
+      PORT: "3000"
+
+  agent-offer:
+    <<: *node
+    command: node agents/offer/main.ts
+    environment:
+      MCP_SERVERS: ""
+
+  agent-inventory:
+    <<: *node
+    command: node agents/inventory/main.ts
+    environment:
+      MCP_SERVERS: ""
+
+  agent-notification:
+    <<: *node
+    command: node agents/notification/main.ts
+    environment:
+      MCP_SERVERS: ""
+
+  agent-shipping:
+    <<: *node
+    command: node agents/shipping/main.ts
+    environment:
+      MCP_SERVERS: ""
+
+  agent-payment:
+    <<: *node
+    command: node agents/payment/main.ts
+    environment:
+      MCP_SERVERS: ""
+
+volumes:
+  pgdata:
