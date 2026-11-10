@@ -1,0 +1,7 @@
+{
+  "name": "shopping",
+  "queue": "shopping-agent",
+  "consumes": ["chat.message"],
+  "emits": ["chat.reply"],
+  "limits": { "max_calls": 8, "max_tokens": 1024, "timeout_ms": 60000, "effort": "low" }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@ac/agent-runtime",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.4.0",
+    "@modelcontextprotocol/client": "2.4.0",
+    "zod": "4.6.7",
+    "@ac/bus": "*",
+    "@ac/events": "*",
+    "@ac/decisions": "*",
+    "@ac/db": "*",
+    "@ac/log": "*"
+  }
+}
