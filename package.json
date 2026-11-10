@@ -1,0 +1,31 @@
+{
+  "name": "agent-commerce",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Proof-of-concept blueprint for multi-agent orchestration. An e-commerce shop is the example use case.",
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "workspaces": [
+    "packages/*",
+    "services/*",
+    "agents/*"
+  ],
+  "scripts": {
+    "check": "bash scripts/check.sh",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "biome ci .",
+    "format": "biome format --write .",
+    "test": "node --test",
+    "logs": "docker compose logs -f --no-log-prefix | pino-pretty",
+    "new-service": "node scripts/new-service.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.4",
+    "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
+    "pino-pretty": "13.2.0",
+    "typescript": "6.0.3"
+  }
+}
