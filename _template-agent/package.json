@@ -1,0 +1,7 @@
+{
+  "name": "@ac/agent-__NAME__",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": { "@ac/agent-runtime": "*" }
+}

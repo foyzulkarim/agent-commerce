@@ -1,0 +1,7 @@
+{
+  "name": "__NAME__",
+  "queue": "__NAME__-agent",
+  "consumes": [__CONSUMES__],
+  "emits": [__EMITS__],
+  "limits": { "max_calls": 8, "max_tokens": 1024, "timeout_ms": 60000, "effort": "low" }
+}
