@@ -1,0 +1,14 @@
+{
+  "name": "@ac/service-chat-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "fastify": "5.12.8",
+    "@fastify/static": "10.1.8",
+    "zod": "4.6.7",
+    "@ac/bus": "*",
+    "@ac/events": "*",
+    "@ac/log": "*"
+  }
+}
