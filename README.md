@@ -18,6 +18,8 @@ cp .env.example .env        # put ANTHROPIC_API_KEY in .env
 docker compose up --build   # 15 containers: 7 services, 6 agents, postgres, rabbitmq
 ```
 
+Behind a company proxy that intercepts TLS, `npm ci` in the build fails with `SELF_SIGNED_CERT_IN_CHAIN`: copy the proxy CA certificate to `./npm-ca.pem` and set `NPM_CA_FILE=./npm-ca.pem` in `.env`.
+
 No key, or the API is down? Set `AGENT_MODE=scripted` in `.env`. The six agents then run fixed rules from `agents/*/scripted.ts`, with the same tools, guards, events and decision records.
 
 | Page                                                                   | URL                    | Actor          |

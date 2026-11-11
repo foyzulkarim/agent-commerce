@@ -6,7 +6,9 @@
 # Agents: ANTHROPIC_API_KEY and MODEL_NAME come from .env. AGENT_MODE=scripted runs them without a model.
 
 x-node: &node
-  build: .
+  build:
+    context: .
+    secrets: [npm_ca]
   image: agent-commerce-node
   env_file:
     - path: .env
@@ -147,3 +149,8 @@ services:
 
 volumes:
   pgdata:
+
+secrets:
+  # Only for a network that intercepts TLS: copy its CA to ./npm-ca.pem, set NPM_CA_FILE=./npm-ca.pem in .env. Empty by default.
+  npm_ca:
+    file: ${NPM_CA_FILE:-/dev/null}

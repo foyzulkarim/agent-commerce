@@ -8,6 +8,11 @@ COPY package.json package-lock.json .npmrc ./
 COPY packages ./packages
 COPY services ./services
 COPY agents ./agents
-RUN npm ci --omit=dev
+# Optional: a network that intercepts TLS (a company proxy) needs its CA certificate for npm.
+# Copy the certificate to ./npm-ca.pem and set NPM_CA_FILE=./npm-ca.pem in .env; compose passes it as a build secret.
+# Without it the secret is empty and npm uses the normal certificate store. TLS checks stay on.
+RUN --mount=type=secret,id=npm_ca \
+    if [ -s /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; \
+    npm ci --omit=dev
 
 USER node
