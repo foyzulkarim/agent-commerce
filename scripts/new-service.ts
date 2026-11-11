@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawnSync } from "node:child_process";
 /**
  * Generator (landscape §6): copies a template, fills the names, adds the compose entry.
  *
@@ -107,6 +108,13 @@ for (const file of await walk(target)) {
   await writeFile(file, fill(text));
 }
 await writeFile(composePath, newCompose);
+
+// Names change line lengths: format the new folder so `biome ci` passes.
+const biome = path.join(root, "node_modules", "@biomejs", "biome", "bin", "biome");
+const formatted = spawnSync(process.execPath, [biome, "format", "--write", target], {
+  stdio: "ignore",
+});
+if (formatted.status !== 0) console.warn("note: run `npx biome format --write` on the new folder");
 
 console.log(`created ${kind} ${path.relative(root, target)} and added it to compose.yaml`);
 console.log("next: npm install  (links the workspace), then docker compose up --build");

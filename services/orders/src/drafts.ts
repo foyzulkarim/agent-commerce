@@ -250,7 +250,7 @@ export async function createOffer(
       "UPDATE stock_watches SET status = 'closed' WHERE draft_id = $1 AND status = 'open'",
       [draftId],
     );
-    await history(tx, draftId, `offer v${version}: total ${offer.total}`, {
+    await history(tx, draftId, `offer v${version}: total AUD ${(offer.total / 100).toFixed(2)}`, {
       decision_id: decisionId,
       detail: offer,
     });

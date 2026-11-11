@@ -1,0 +1,192 @@
+diff --git a/agent-commerce/compose.yaml b/agent-commerce/compose.yaml
+index bd755df..1cb18ce 100644
+--- a/agent-commerce/compose.yaml
++++ b/agent-commerce/compose.yaml
+@@ -145,5 +145,12 @@ services:
+     environment:
+       MCP_SERVERS: http://payment-mock:3006/mcp
+ 
++  loyalty:
++    <<: *node
++    command: node services/loyalty/src/main.ts
++    environment:
++      DATABASE_URL: postgres://ac:ac@postgres:5432/loyalty
++      PORT: "3007"
++
+ volumes:
+   pgdata:
+diff --git a/agent-commerce/packages/events/src/index.ts b/agent-commerce/packages/events/src/index.ts
+index e6167f7..d82e0a8 100644
+--- a/agent-commerce/packages/events/src/index.ts
++++ b/agent-commerce/packages/events/src/index.ts
+@@ -21,6 +21,7 @@ export const EVENT_TYPES = [
+   "payment.authorized",
+   "payment.captured",
+   "payment.failed",
++  "points.awarded",
+ ] as const;
+ 
+ export type EventType = (typeof EVENT_TYPES)[number];
+@@ -73,6 +74,7 @@ export const payloads = {
+   "payment.authorized": z.object({ authorization_id: z.string() }),
+   "payment.captured": z.object({ capture_id: z.string() }),
+   "payment.failed": z.object({ reason: z.enum(["declined", "unknown"]) }),
++  "points.awarded": z.object({ points: z.number().int().positive() }),
+ } as const satisfies Record<EventType, z.ZodObject>;
+ 
+ export type PayloadOf<T extends EventType> = z.infer<(typeof payloads)[T]>;
+diff --git a/agent-commerce/services/loyalty/migrations/001_init.sql b/agent-commerce/services/loyalty/migrations/001_init.sql
+new file mode 100644
+index 0000000..a6b7b8b
+--- /dev/null
++++ b/agent-commerce/services/loyalty/migrations/001_init.sql
+@@ -0,0 +1,6 @@
++-- loyalty: first migration. One table to start; add columns in a new file, never edit an applied file.
++CREATE TABLE IF NOT EXISTS loyalty_events_seen (
++  event_id    uuid PRIMARY KEY,
++  event_type  text NOT NULL,
++  seen_at     timestamptz NOT NULL DEFAULT now()
++);
+diff --git a/agent-commerce/services/loyalty/package.json b/agent-commerce/services/loyalty/package.json
+new file mode 100644
+index 0000000..3cf4904
+--- /dev/null
++++ b/agent-commerce/services/loyalty/package.json
+@@ -0,0 +1,15 @@
++{
++  "name": "@ac/service-loyalty",
++  "private": true,
++  "version": "0.1.0",
++  "type": "module",
++  "dependencies": {
++    "fastify": "5.12.8",
++    "zod": "4.6.7",
++    "@ac/bus": "*",
++    "@ac/db": "*",
++    "@ac/events": "*",
++    "@ac/log": "*",
++    "@ac/mcp-kit": "*"
++  }
++}
+diff --git a/agent-commerce/services/loyalty/seed/001_seed.sql b/agent-commerce/services/loyalty/seed/001_seed.sql
+new file mode 100644
+index 0000000..0633870
+--- /dev/null
++++ b/agent-commerce/services/loyalty/seed/001_seed.sql
+@@ -0,0 +1 @@
++-- loyalty: idempotent seed. Runs on every start, so use ON CONFLICT DO NOTHING.
+diff --git a/agent-commerce/services/loyalty/src/main.ts b/agent-commerce/services/loyalty/src/main.ts
+new file mode 100644
+index 0000000..d731f0c
+--- /dev/null
++++ b/agent-commerce/services/loyalty/src/main.ts
+@@ -0,0 +1,46 @@
++import path from "node:path";
++import { connectBus } from "@ac/bus";
++import { query, startDatabase } from "@ac/db";
++import { type EventType, newEvent } from "@ac/events";
++import { log } from "@ac/log";
++import { createApp, registerMcp } from "@ac/mcp-kit";
++import { loyaltyTools } from "./tools.ts";
++
++const logger = log("loyalty");
++const PORT = Number(process.env.PORT ?? 3000);
++const here = import.meta.dirname;
++
++/** The events this service reacts to (design §12 part 2). Each name becomes one RabbitMQ binding. */
++const CONSUMES: EventType[] = ["shipment.delivered"];
++
++const pool = await startDatabase({
++  databaseUrl: process.env.DATABASE_URL ?? "postgres://ac:ac@postgres:5432/loyalty",
++  migrationsDir: path.join(here, "..", "migrations"),
++  seedDir: path.join(here, "..", "seed"),
++  log: logger,
++});
++
++const bus = await connectBus(process.env.AMQP_URL ?? "amqp://ac:ac@rabbitmq:5672", logger);
++
++if (CONSUMES.length > 0) {
++  await bus.consume("loyalty", CONSUMES, async (event) => {
++    await query(
++      pool,
++      "INSERT INTO loyalty_events_seen (event_id, event_type) VALUES ($1, $2) ON CONFLICT DO NOTHING",
++      [event.event_id, event.type],
++    );
++    logger.info({ type: event.type, event_id: event.event_id }, "event seen");
++    if (event.type === "shipment.delivered") {
++      await bus.publish(
++        newEvent({ type: "points.awarded", payload: { points: 10 }, draft_id: event.draft_id }),
++      );
++    }
++  });
++}
++
++const app = createApp();
++app.get("/health", async () => ({ ok: true, service: "loyalty" }));
++registerMcp(app, { name: "loyalty", tools: loyaltyTools(pool), log: logger });
++
++await app.listen({ port: PORT, host: "0.0.0.0" });
++logger.info({ port: PORT, consumes: CONSUMES }, "loyalty listening; MCP on /mcp");
+diff --git a/agent-commerce/services/loyalty/src/tools.ts b/agent-commerce/services/loyalty/src/tools.ts
+new file mode 100644
+index 0000000..938b6da
+--- /dev/null
++++ b/agent-commerce/services/loyalty/src/tools.ts
+@@ -0,0 +1,31 @@
++import { type Pool, query } from "@ac/db";
++import { defineTool, GuardError } from "@ac/mcp-kit";
++import { z } from "zod";
++
++/** The MCP tools of loyalty. A guard runs in the server; the agent only asks. */
++export function loyaltyTools(pool: Pool) {
++  const countSeen = defineTool({
++    name: "loyalty_count_seen",
++    description: "Returns how many events loyalty has seen. Read only; no guard.",
++    input: z.object({}),
++    run: async () => {
++      const result = await query<{ n: string }>(
++        pool,
++        "SELECT count(*)::text AS n FROM loyalty_events_seen",
++      );
++      return { seen: Number(result.rows[0]?.n ?? 0) };
++    },
++  });
++
++  const example = defineTool({
++    name: "loyalty_example",
++    description: "An example of a guarded tool. Replace it.",
++    input: z.object({ amount: z.number().int().nonnegative() }),
++    guard: ({ amount }) => {
++      if (amount > 1000) throw new GuardError("amount above 1000 is not allowed");
++    },
++    run: async ({ amount }) => ({ accepted: amount }),
++  });
++
++  return [countSeen, example];
++}
+diff --git a/agent-commerce/services/orders/src/status-updater.ts b/agent-commerce/services/orders/src/status-updater.ts
+index ed558e1..2a20d94 100644
+--- a/agent-commerce/services/orders/src/status-updater.ts
++++ b/agent-commerce/services/orders/src/status-updater.ts
+@@ -11,6 +11,7 @@ export const STATUS_EVENTS: EventType[] = [
+   "payment.authorized",
+   "payment.captured",
+   "payment.failed",
++  "points.awarded",
+ ];
+ 
+ /**
+@@ -23,6 +24,13 @@ export function statusHandler(deps: Deps) {
+     const draftId = event.draft_id;
+     await withTransaction(deps.pool, async (tx) => {
+       const draft = await lockDraft(tx, draftId);
++      if (draft?.state === "completed" && event.type === "points.awarded") {
++        await notify(tx, draft, "points_awarded", [event.decision_id]);
++        await history(tx, draftId, `points awarded: ${event.payload.points}`, {
++          event_type: event.type,
++        });
++        return;
++      }
+       if (draft?.state !== "confirmed") {
+         const reason = draft ? `draft_${draft.state}` : "unknown_draft";
+         await query(

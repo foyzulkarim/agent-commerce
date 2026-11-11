@@ -88,7 +88,12 @@ export function render(event: Envelope): string {
   ].join("\n");
 }
 
-const schemaOf = (s: z.ZodType) => z.toJSONSchema(s) as Tool["input_schema"];
+/** A tool input schema for the Messages API, without the `$schema` key that zod and MCP add. */
+function cleanSchema(schema: unknown): Tool["input_schema"] {
+  const { $schema: _ignored, ...rest } = (schema ?? {}) as Record<string, unknown>;
+  return { type: "object", ...rest } as Tool["input_schema"];
+}
+const schemaOf = (s: z.ZodType) => cleanSchema(z.toJSONSchema(s));
 
 function localTools(
   config: AgentConfig,
@@ -216,7 +221,7 @@ async function connectMcp(urls: string[], agentName: string, log: Logger): Promi
         tool: {
           name: t.name,
           description: t.description ?? "",
-          input_schema: t.inputSchema as Tool["input_schema"],
+          input_schema: cleanSchema(t.inputSchema),
         },
       });
     }
