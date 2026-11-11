@@ -86,4 +86,4 @@ The generator copies `_template-service/` or `_template-agent/`, fills the names
 | `packages/log`           | `log(name)` over pino                                                                                                                 |
 | `services/*`             | One container each: `src/main.ts`, `migrations/`, `seed/`, `public/`                                                                  |
 | `agents/*`               | One container each: `prompt.md`, `agent.json`, `main.ts`, and `scripted.ts` (fallback)                                                |
-| `scripts/`               | `new-service.ts`, `check.sh`, `dev-host.sh`, `e2e.ts`, `reset.sh`                                                                     |
+| `scripts/`               | `new-service.ts`, `check.sh`, `dev-host.sh`, `e2e.ts`, `reset.sh`, `cost.ts` (cost per order)                                         |
