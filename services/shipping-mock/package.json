@@ -10,6 +10,7 @@
     "@ac/db": "*",
     "@ac/events": "*",
     "@ac/log": "*",
-    "@ac/mcp-kit": "*"
+    "@ac/mcp-kit": "*",
+    "@fastify/static": "10.1.8"
   }
 }

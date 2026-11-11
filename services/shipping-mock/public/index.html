@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>agent-commerce: courier</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <header><h1>Courier</h1><span class="muted">shipping mock · dispatch publishes shipment.dispatched · deliver publishes shipment.delivered</span></header>
+  <table>
+    <thead><tr><th>Tracking</th><th>Draft</th><th>Status</th><th>Booked</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p id="status" class="muted"></p>
+</main>
+<script>
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+async function move(id, step) {
+  const res = await fetch(`/courier/${encodeURIComponent(id)}/${step}`, { method: "POST" });
+  const data = await res.json();
+  document.getElementById("status").textContent = res.ok ? `${id}: ${data.status}` : data.message;
+  load();
+}
+async function load() {
+  const rows = await (await fetch("/bookings")).json();
+  document.getElementById("rows").innerHTML = rows.length === 0
+    ? `<tr><td colspan="5" class="muted">No booking yet.</td></tr>`
+    : rows.map((b) => `<tr><td>${esc(b.tracking_id)}</td><td>${esc(b.draft_id.slice(0, 8))}</td><td><span class="tag">${esc(b.status)}</span></td>
+      <td>${new Date(b.created_at).toLocaleTimeString()}</td>
+      <td>${b.status === "booked" ? `<button onclick="move('${esc(b.tracking_id)}','dispatch')">Dispatch</button>` : ""}
+          ${b.status === "dispatched" ? `<button onclick="move('${esc(b.tracking_id)}','deliver')">Deliver</button>` : ""}</td></tr>`).join("");
+}
+load();
+setInterval(load, 3000);
+</script>
+</body>
+</html>

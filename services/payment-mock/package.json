@@ -6,9 +6,7 @@
   "dependencies": {
     "fastify": "5.12.8",
     "zod": "4.6.7",
-    "@ac/bus": "*",
     "@ac/db": "*",
-    "@ac/events": "*",
     "@ac/log": "*",
     "@ac/mcp-kit": "*"
   }
