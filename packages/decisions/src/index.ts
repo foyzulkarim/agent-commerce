@@ -70,3 +70,16 @@ export async function readDecisions(pool: Pool, decisionIds: string[]): Promise<
   );
   return result.rows;
 }
+
+/** All decision records of one draft, in `started_at` order. For the board page. */
+export async function readDecisionsForDraft(
+  pool: Pool,
+  draftId: string,
+): Promise<DecisionRecord[]> {
+  const result = await query<DecisionRecord>(
+    pool,
+    "SELECT * FROM decision_records WHERE draft_id = $1 ORDER BY started_at",
+    [draftId],
+  );
+  return result.rows;
+}

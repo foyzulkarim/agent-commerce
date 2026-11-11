@@ -6,7 +6,8 @@
       "!**/node_modules",
       "!**/package-lock.json",
       "!_template-service",
-      "!_template-agent"
+      "!_template-agent",
+      "!.dev-logs"
     ]
   },
   "formatter": {
@@ -26,5 +27,17 @@
       "quoteStyle": "double",
       "semicolons": "always"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["**/public/**"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedVariables": "off"
+          }
+        }
+      }
+    }
+  ]
 }

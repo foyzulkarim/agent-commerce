@@ -8,7 +8,10 @@ export type PoolClient = pg.PoolClient;
 export type QueryResult<T extends pg.QueryResultRow = pg.QueryResultRow> = pg.QueryResult<T>;
 
 export function createPool(databaseUrl: string): Pool {
-  return new pg.Pool({ connectionString: databaseUrl, max: 5 });
+  const pool = new pg.Pool({ connectionString: databaseUrl, max: 5 });
+  // An idle client can lose its connection; without a listener the process would crash.
+  pool.on("error", (error) => console.error("postgres pool error:", error.message));
+  return pool;
 }
 
 export function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
@@ -56,8 +59,14 @@ export async function ensureDatabase(databaseUrl: string, log: Logger): Promise<
   try {
     const found = await admin.query("SELECT 1 FROM pg_database WHERE datname = $1", [name]);
     if (found.rowCount === 0) {
-      await admin.query(`CREATE DATABASE "${name}"`);
-      log.info({ database: name }, "database created");
+      try {
+        await admin.query(`CREATE DATABASE "${name}"`);
+        log.info({ database: name }, "database created");
+      } catch (error) {
+        // Two containers (for example two agents) can create the same database at the same moment.
+        const code = (error as { code?: string }).code;
+        if (code !== "42P04" && code !== "23505") throw error;
+      }
     }
   } finally {
     await admin.end();

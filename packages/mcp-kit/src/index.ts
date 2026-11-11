@@ -2,21 +2,27 @@ import { Readable } from "node:stream";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import type { Logger } from "@ac/log";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
-import fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { z } from "zod";
 
-/** Thrown by a guard. The tool returns it to the agent as an error result; nothing runs. */
+export { connectTool, type ToolClient, ToolError } from "./client.ts";
+export { createApp, escapeHtml, htmlPage, wantsHtml } from "./http.ts";
+
+/** Thrown by a guard. The tool returns it to the caller as an error result; `run` does not start. */
 export class GuardError extends Error {
   override name = "GuardError";
 }
+
+/** Who called the tool. `decision_id` is set when an agent turn made the call (header `x-decision-id`). */
+export type CallContext = { decision_id: string | null };
 
 export type ToolDef<I extends z.ZodObject = z.ZodObject> = {
   name: string;
   description: string;
   input: I;
   /** Checks the input before `run`. Throw `GuardError` to refuse. Read-only tools have no guard. */
-  guard?: (input: z.infer<I>) => Promise<void> | void;
-  run: (input: z.infer<I>) => Promise<unknown>;
+  guard?: (input: z.infer<I>, ctx: CallContext) => Promise<void> | void;
+  run: (input: z.infer<I>, ctx: CallContext) => Promise<unknown>;
 };
 
 /** The one way to declare a tool. The guard runs in the server, never in the agent (design rule 8). */
@@ -24,17 +30,20 @@ export function defineTool<I extends z.ZodObject>(def: ToolDef<I>): ToolDef<I> {
   return def;
 }
 
+export const DECISION_HEADER = "x-decision-id";
+
+const result = (text: string, isError = false) => ({
+  content: [{ type: "text" as const, text }],
+  ...(isError ? { isError: true } : {}),
+});
+
 export type ServeOptions = {
   name: string;
   version?: string;
-  tools: ToolDef[];
+  // biome-ignore lint/suspicious/noExplicitAny: a list of tools with different input schemas
+  tools: ToolDef<any>[];
   log: Logger;
 };
-
-/** A Fastify app without its own logger. Services log through `@ac/log`. */
-export function createApp(): FastifyInstance {
-  return fastify({ logger: false });
-}
 
 function toWebRequest(request: FastifyRequest): Request {
   const headers = new Headers();
@@ -54,29 +63,34 @@ function toWebRequest(request: FastifyRequest): Request {
 export function registerMcp(app: FastifyInstance, options: ServeOptions): void {
   const { name, version = "0.1.0", tools, log } = options;
   const handler = createMcpHandler(
-    () => {
+    (request) => {
+      const ctx: CallContext = {
+        decision_id: request.requestInfo?.headers.get(DECISION_HEADER) || null,
+      };
       const server = new McpServer({ name, version });
       for (const tool of tools) {
         server.registerTool(
           tool.name,
           { description: tool.description, inputSchema: tool.input },
           async (args: unknown) => {
-            const input = tool.input.parse(args);
+            const parsed = tool.input.safeParse(args);
+            if (!parsed.success) {
+              return result(`Bad input: ${parsed.error.message}`, true);
+            }
+            const input = parsed.data;
             try {
-              await tool.guard?.(input);
+              await tool.guard?.(input, ctx);
+              const output = await tool.run(input, ctx);
+              log.info({ tool: tool.name, input, decision_id: ctx.decision_id }, "tool ran");
+              return result(JSON.stringify(output ?? null));
             } catch (error) {
               if (error instanceof GuardError) {
                 log.warn({ tool: tool.name, input, reason: error.message }, "guard refused");
-                return {
-                  isError: true,
-                  content: [{ type: "text", text: `Refused: ${error.message}` }],
-                };
+                return result(`Refused: ${error.message}`, true);
               }
-              throw error;
+              log.error({ err: error, tool: tool.name, input }, "tool failed");
+              return result(`Failed: ${(error as Error).message}`, true);
             }
-            const result = await tool.run(input);
-            log.info({ tool: tool.name, input }, "tool ran");
-            return { content: [{ type: "text", text: JSON.stringify(result) }] };
           },
         );
       }

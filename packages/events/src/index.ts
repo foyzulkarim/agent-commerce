@@ -35,8 +35,17 @@ const sku = z.string().min(1);
 export const payloads = {
   "chat.message": z.object({ text: z.string().min(1), customer_id: z.string().min(1) }),
   "chat.reply": z.object({ text: z.string().min(1), customer_id: z.string().min(1) }),
-  "stock.restocked": z.object({ sku, quantity: z.number().int().positive(), price: money }),
-  "price.changed": z.object({ sku, new_price: money }),
+  "stock.restocked": z.object({
+    sku,
+    quantity: z.number().int().positive().describe("units added"),
+    available_qty: z.number().int().nonnegative().describe("units free to sell after the restock"),
+    price: money,
+  }),
+  "price.changed": z.object({
+    sku,
+    new_price: money,
+    available_qty: z.number().int().nonnegative(),
+  }),
   "watch.matched": z.object({
     watch_id: z.string(),
     sku,
@@ -46,8 +55,12 @@ export const payloads = {
   "composition.requested": z.object({ sku, quantity: z.number().int().positive() }),
   "composition.proposed": z.object({
     items: z.array(z.object({ sku, quantity: z.number().int().positive() })),
+    note: z.string().optional(),
   }),
-  "notification.requested": z.object({ reason: z.string(), decision_ids: z.array(z.string()) }),
+  "notification.requested": z.object({
+    reason: z.string().min(1).describe("for example offer_ready, order_dispatched"),
+    decision_ids: z.array(z.string()),
+  }),
   "order.confirmed": z.object({ offer_version: z.number().int().positive() }),
   "address.provided": z.object({}),
   "shipment.quoted": z.object({ quote_id: z.string(), fee: money }),
