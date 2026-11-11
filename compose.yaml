@@ -1,7 +1,9 @@
-# agent-commerce. One Node image for every service and agent; the command differs per container.
-# 15 containers (design §14): 7 services, 6 agents, postgres, rabbitmq. Host ports: chat-ui 3000, orders 3001,
-# email 3002, catalogue-mock 3003, shipping-mock 3004, RabbitMQ UI 15672. MCP ports stay inside the network.
-# AMQP_URL, DECISIONS_DATABASE_URL and MODEL_NAME have defaults in code; ANTHROPIC_API_KEY comes from .env.
+# agent-commerce: 15 containers (design §14): 7 services, 6 agents, postgres, rabbitmq.
+# One Node image for all; the command differs per container.
+# Host ports: chat-ui 3000, orders 3001 (board), email 3002 (inbox), catalogue-mock 3003 (manager),
+# shipping-mock 3004 (courier), RabbitMQ UI 15672. Postgres 55432 and AMQP 55672 are for host runs (scripts/dev-host.sh).
+# customers (3005) and payment-mock (3006) have no host port.
+# Agents: ANTHROPIC_API_KEY and MODEL_NAME come from .env. AGENT_MODE=scripted runs them without a model.
 
 x-node: &node
   build: .
@@ -22,6 +24,8 @@ services:
     environment:
       POSTGRES_USER: ac
       POSTGRES_PASSWORD: ac
+    ports:
+      - "55432:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
@@ -37,12 +41,14 @@ services:
       RABBITMQ_DEFAULT_PASS: ac
     ports:
       - "15672:15672"
+      - "55672:5672"
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  # ---------------------------------------------------------------- services
   chat-ui:
     <<: *node
     command: node services/chat-ui/src/main.ts
@@ -57,21 +63,8 @@ services:
     ports:
       - "3001:3001"
     environment:
-      DATABASE_URL: postgres://ac:ac@postgres:5432/orders
       PORT: "3001"
-
-  agent-shopping:
-    <<: *node
-    command: node agents/shopping/main.ts
-    environment:
-      MCP_SERVERS: http://orders:3001/mcp
-
-  customers:
-    <<: *node
-    command: node services/customers/src/main.ts
-    environment:
-      DATABASE_URL: postgres://ac:ac@postgres:5432/customers
-      PORT: "3000"
+      DATABASE_URL: postgres://ac:ac@postgres:5432/orders
 
   email:
     <<: *node
@@ -79,8 +72,9 @@ services:
     ports:
       - "3002:3002"
     environment:
-      DATABASE_URL: postgres://ac:ac@postgres:5432/email
       PORT: "3002"
+      DATABASE_URL: postgres://ac:ac@postgres:5432/email
+      PUBLIC_BASE_URL_ORDERS: http://localhost:3001
 
   catalogue-mock:
     <<: *node
@@ -88,8 +82,8 @@ services:
     ports:
       - "3003:3003"
     environment:
-      DATABASE_URL: postgres://ac:ac@postgres:5432/catalogue_mock
       PORT: "3003"
+      DATABASE_URL: postgres://ac:ac@postgres:5432/catalogue
 
   shipping-mock:
     <<: *node
@@ -97,45 +91,59 @@ services:
     ports:
       - "3004:3004"
     environment:
-      DATABASE_URL: postgres://ac:ac@postgres:5432/shipping_mock
       PORT: "3004"
+      DATABASE_URL: postgres://ac:ac@postgres:5432/shipping
+
+  customers:
+    <<: *node
+    command: node services/customers/src/main.ts
+    environment:
+      PORT: "3005"
+      DATABASE_URL: postgres://ac:ac@postgres:5432/customers
 
   payment-mock:
     <<: *node
     command: node services/payment-mock/src/main.ts
     environment:
-      DATABASE_URL: postgres://ac:ac@postgres:5432/payment_mock
-      PORT: "3000"
+      PORT: "3006"
+      DATABASE_URL: postgres://ac:ac@postgres:5432/payment
+
+  # ---------------------------------------------------------------- agents
+  agent-shopping:
+    <<: *node
+    command: node agents/shopping/main.ts
+    environment:
+      MCP_SERVERS: http://catalogue-mock:3003/mcp,http://orders:3001/mcp
 
   agent-offer:
     <<: *node
     command: node agents/offer/main.ts
     environment:
-      MCP_SERVERS: ""
+      MCP_SERVERS: http://orders:3001/mcp,http://catalogue-mock:3003/mcp
 
   agent-inventory:
     <<: *node
     command: node agents/inventory/main.ts
     environment:
-      MCP_SERVERS: ""
+      MCP_SERVERS: http://catalogue-mock:3003/mcp
 
   agent-notification:
     <<: *node
     command: node agents/notification/main.ts
     environment:
-      MCP_SERVERS: ""
+      MCP_SERVERS: http://orders:3001/mcp,http://email:3002/mcp
 
   agent-shipping:
     <<: *node
     command: node agents/shipping/main.ts
     environment:
-      MCP_SERVERS: ""
+      MCP_SERVERS: http://shipping-mock:3004/mcp
 
   agent-payment:
     <<: *node
     command: node agents/payment/main.ts
     environment:
-      MCP_SERVERS: ""
+      MCP_SERVERS: http://payment-mock:3006/mcp
 
 volumes:
   pgdata:

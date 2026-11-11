@@ -3,5 +3,6 @@
   "queue": "inventory-agent",
   "consumes": ["composition.requested"],
   "emits": ["composition.proposed"],
-  "limits": { "max_calls": 8, "max_tokens": 1024, "timeout_ms": 60000, "effort": "low" }
+  "tools": ["search_products"],
+  "limits": { "max_calls": 6, "max_tokens": 4096, "timeout_ms": 60000, "effort": "low" }
 }
