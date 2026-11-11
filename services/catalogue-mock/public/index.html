@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>agent-commerce: manager</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<main>
+  <header><h1>Shop manager</h1><span class="muted">catalogue mock · restock publishes stock.restocked · price publishes price.changed</span></header>
+  <table>
+    <thead><tr><th>SKU</th><th>Name</th><th>Price</th><th>Stock</th><th>Reserved</th><th>Available</th><th>Restock</th><th>New price (AUD)</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p id="status" class="muted"></p>
+</main>
+<script>
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const aud = (c) => `AUD ${(c / 100).toFixed(2)}`;
+async function post(url, body) {
+  const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json();
+  document.getElementById("status").textContent = res.ok ? `${url}: done (event ${data.event_id ?? "-"})` : `${url}: ${data.error}`;
+  load();
+}
+async function load() {
+  const products = await (await fetch("/products")).json();
+  document.getElementById("rows").innerHTML = products.map((p) => `<tr>
+    <td>${esc(p.sku)}</td><td>${esc(p.name)}</td><td>${aud(p.unit_price)}</td><td>${p.stock}</td><td>${p.reserved}</td><td>${p.available}</td>
+    <td class="row"><input type="number" min="1" value="1" size="3" id="q-${esc(p.sku)}" style="width:64px"><button onclick="post('/manager/restock',{sku:'${esc(p.sku)}',quantity:Number(document.getElementById('q-${esc(p.sku)}').value)})">Restock</button></td>
+    <td class="row"><input type="number" min="0" step="0.01" value="${(p.unit_price / 100).toFixed(2)}" id="p-${esc(p.sku)}" style="width:84px"><button class="secondary" onclick="post('/manager/price',{sku:'${esc(p.sku)}',price:Math.round(Number(document.getElementById('p-${esc(p.sku)}').value)*100)})">Set</button></td>
+  </tr>`).join("");
+}
+load();
+setInterval(() => { if (document.activeElement?.tagName !== "INPUT") load(); }, 3000);
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>agent-commerce: board</title>
+  <link rel="stylesheet" href="/style.css">
+  <style> main { max-width: 1100px; } .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: 12px; } @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } } tr.sel { background: var(--me); } tr { cursor: pointer; } </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Orders board</h1>
+    <div class="row">
+      <button type="button" class="secondary" onclick="tick(0)">Timer tick</button>
+      <button type="button" class="secondary" onclick="tick(120)">Tick +120 min</button>
+    </div>
+  </header>
+  <p id="status" class="muted">Drafts, offers, history and the decision records of each draft. The Timer runs on a schedule; the buttons call POST /timer/tick.</p>
+  <div class="grid">
+    <div><table><thead><tr><th>Customer</th><th>State</th><th>Delivery</th><th>Payment</th><th>Total</th></tr></thead><tbody id="drafts"></tbody></table></div>
+    <div id="detail" class="card muted">Select a draft.</div>
+  </div>
+</main>
+<script src="/board.js"></script>
+</body>
+</html>

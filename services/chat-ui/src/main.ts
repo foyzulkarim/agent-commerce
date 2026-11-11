@@ -10,12 +10,8 @@ const logger = log("chat-ui");
 const PORT = Number(process.env.PORT ?? 3000);
 const here = import.meta.dirname;
 
-/** Demo login (design rule 12). Phase 2 reads this list from the customers service. */
-const DEMO_CUSTOMERS = [
-  { customer_id: "cust-mia", name: "Mia" },
-  { customer_id: "cust-dan", name: "Dan" },
-  { customer_id: "cust-nora", name: "Nora" },
-];
+/** Demo login (design rule 12): the list comes from the customers service. */
+const CUSTOMERS_URL = process.env.CUSTOMERS_URL ?? "http://customers:3005";
 
 const bus = await connectBus(process.env.AMQP_URL ?? "amqp://ac:ac@rabbitmq:5672", logger);
 
@@ -41,7 +37,15 @@ const app = fastify({ logger: false });
 await app.register(fastifyStatic, { root: path.join(here, "..", "public") });
 
 app.get("/health", async () => ({ ok: true, service: "chat-ui" }));
-app.get("/customers", async () => DEMO_CUSTOMERS);
+app.get("/customers", async (_request, reply) => {
+  try {
+    const res = await fetch(`${CUSTOMERS_URL}/customers`);
+    return await res.json();
+  } catch (error) {
+    logger.warn({ err: error }, "customers service not reachable");
+    return reply.status(503).send({ error: "customers service not reachable" });
+  }
+});
 
 const MessageBody = z.object({ customer_id: z.string().min(1), text: z.string().min(1).max(2000) });
 
