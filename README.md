@@ -2,12 +2,11 @@
 
 A proof-of-concept blueprint for multi-agent orchestration. An e-commerce shop is the example use case: a customer asks in a chat, waits for stock, approves an offer from an email, and a chain of agents and plain-code reactors ships and charges the order.
 
-| Document                                                           | What                                                                |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| [`../docs/multi-agent-design.md`](../docs/multi-agent-design.md)   | The architecture (v7) and the decisions made during the build (§14) |
-| [`../docs/technical-landscape.md`](../docs/technical-landscape.md) | The stack, versions, sources                                        |
-| [`../docs/demo-runbook.md`](../docs/demo-runbook.md)               | The show-and-tell, step by step, with curl fallbacks                |
-| [`../docs/handover-local.md`](../docs/handover-local.md)           | State of the build and what to check on a local machine             |
+| Document                                                     | What                                                                |
+| ------------------------------------------------------------ | ------------------------------------------------------------------- |
+| [`docs/multi-agent-design.md`](docs/multi-agent-design.md)   | The architecture (v7) and the decisions made during the build (§14) |
+| [`docs/technical-landscape.md`](docs/technical-landscape.md) | The stack, versions, sources                                        |
+| [`docs/demo-runbook.md`](docs/demo-runbook.md)               | The show-and-tell, step by step, with curl fallbacks                |
 
 ## Start
 
